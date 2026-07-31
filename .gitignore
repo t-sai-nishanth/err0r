@@ -1,4 +1,3 @@
-__pycache__/
-.pytest_cache/
-.venv/
-.ipynb_checkpoints/
+tree origin/main:.gitignore
+
+memory.md
