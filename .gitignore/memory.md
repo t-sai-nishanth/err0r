@@ -18,6 +18,35 @@ BookError is a notebook-aware causal error localizer for Jupyter. It hooks into 
 
 No code has been written. The project is in the documentation and planning phase.
 
+### Person B: Tracer Work Queue
+
+Use this section as the running progress log for the tracer layer. Update it after each completed task.
+
+1. [x] Find the failure frame from the exception traceback and normalize IPython cell filenames.
+2. [x] Extract implicated variables from the failing line by exception type.
+3. [x] Walk the dependency graph backward from the failing `exec_id` and implicated variables.
+4. [x] Collapse and order the raw chain into a `CausalPath`.
+5. [x] Summarize each hop with a short human-readable description.
+6. [x] Wire `trace_error()` together and verify it against the mock fixtures.
+
+### Person B: Progress Log
+
+- 2026-07-31: Tracer layer still consists of skeleton functions in `bookerrror/tracer/`.
+- 2026-07-31: `tests/fixtures/sample_data.py` already provides `MOCK_RECORDS`, `MOCK_EDGES`, and `MOCK_CAUSAL_PATH` that match the intended causal chain.
+- 2026-07-31: No tracer-specific tests exist yet; add them alongside the implementation.
+- 2026-07-31: Tracer core implemented and validated with `pytest -q tests/test_tracer.py`.
+- 2026-07-31: The raw backward walk now reproduces the mock causal chain and the top-level `trace_error()` wrapper fills in summaries.
+
+### Person B: Smooth Execution Rules
+
+- Build in this order: frame walker -> var extractor -> graph walker -> collapser -> summarizer -> `trace_error()`.
+- Use `tests/fixtures/sample_data.py` as the first validation target before wiring to the real tracker.
+- Keep the graph walker interface compatible with the mock graph contract (`get_edges_to()` and `get_record()`) so integration stays cheap.
+- If a step is unclear, return a small placeholder object or empty path first, then refine it.
+- Do not expand into presentation or tracker code while the tracer core is still failing.
+- Treat `CausalPath` shape stability as a sync-point requirement; do not change it casually.
+- Prefer one narrow test per component before writing broader integration coverage.
+
 ### Completed
 
 - [x] Project concept finalized (from solution.md).
@@ -39,6 +68,7 @@ No code has been written. The project is in the documentation and planning phase
 1. **Phase 1: Foundation + Tracker** — Create the Python package, implement IPython hooks, build the AST analyzer, construct the dependency graph.
 2. Start with the AST analyzer (`ast_analyzer.py`) — it's the most complex individual component and everything depends on its correctness.
 3. Get `%load_ext bookerrror` working and printing a "BookError active" message before building any feature code.
+4. **Person B focus:** Keep working on the tracer layer and its integration points only; do not own tracker-layer files.
 
 ---
 
