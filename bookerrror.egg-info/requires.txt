@@ -1,0 +1,9 @@
+ipython>=8.0
+
+[dev]
+pytest>=7.0
+
+[llm]
+anthropic>=0.20
+openai>=1.0
+google-generativeai>=0.5
