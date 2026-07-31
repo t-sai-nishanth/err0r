@@ -23,12 +23,15 @@ def trace_back(graph, failing_exec_id: int, implicated_vars: set[str]) -> list[T
     if record is None:
         return []
 
-    start_vars = set(implicated_vars) or set(record.reads) or set(record.writes) or set(record.defines)
+    read_vars = set(record.reads)
+    implicated_read_vars = read_vars & set(implicated_vars)
+    start_vars = implicated_read_vars or read_vars or set(implicated_vars) or set(record.writes) or set(record.defines)
     if not start_vars:
         start_vars = {""}
 
     queue = deque((failing_exec_id, variable) for variable in start_vars)
     visited: set[tuple[int, str]] = set()
+    emitted_execs: set[int] = set()
     nodes: list[TraceNode] = []
 
     while queue:
@@ -53,16 +56,18 @@ def trace_back(graph, failing_exec_id: int, implicated_vars: set[str]) -> list[T
                     failing_line=raised.failing_line,
                 )
 
-        nodes.append(
-            TraceNode(
-                cell_id=current_record.cell_id,
-                exec_id=current_record.exec_id,
-                variable=variable,
-                source_snippet=current_record.source,
-                role="failure" if exec_id == failing_exec_id else "intermediate",
-                failure=failure,
+        if exec_id not in emitted_execs:
+            emitted_execs.add(exec_id)
+            nodes.append(
+                TraceNode(
+                    cell_id=current_record.cell_id,
+                    exec_id=current_record.exec_id,
+                    variable=variable,
+                    source_snippet=current_record.source,
+                    role="failure" if exec_id == failing_exec_id else "intermediate",
+                    failure=failure,
+                )
             )
-        )
 
         for edge in graph.get_edges_to(exec_id):
             if variable and edge.variable != variable:

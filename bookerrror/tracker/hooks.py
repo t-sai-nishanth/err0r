@@ -9,8 +9,12 @@ from typing import Any
 from IPython import get_ipython
 
 from bookerrror.models import Edge, ExecutionRecord, ExceptionInfo
+from bookerrror.llm import explain as llm_explain, is_enabled as llm_is_enabled
+from bookerrror.presentation import render_causal_path, render_no_chain
 from bookerrror.tracker.ast_analyzer import analyze_cell
 from bookerrror.tracker.graph import DependencyGraph
+from bookerrror.tracer import trace_error
+from bookerrror.utils.ipython_helpers import get_cell_id as helper_get_cell_id
 
 
 _LOGGER = logging.getLogger("bookerrror")
@@ -22,10 +26,12 @@ class ExecutionTracker:
 
     graph: DependencyGraph
     _pre_run_snapshot: dict[str, int] | None = None
+    _last_exception: BaseException | None = None
 
     def __init__(self) -> None:
         self.graph = DependencyGraph()
         self._pre_run_snapshot = None
+        self._last_exception = None
 
     def pre_run_cell(self, info: Any) -> None:
         """Capture the current ownership state before the cell runs."""
@@ -45,6 +51,7 @@ class ExecutionTracker:
 
             raised = None
             error = getattr(result, "error_in_exec", None)
+            self._last_exception = error
             if error is not None:
                 raised = self._capture_exception(error, source)
 
@@ -64,6 +71,10 @@ class ExecutionTracker:
 
     def _get_cell_id(self, result: Any) -> str:
         """Extract a stable cell id from notebook metadata when available."""
+
+        cell_id = helper_get_cell_id(result)
+        if cell_id:
+            return cell_id
 
         try:
             ipython = get_ipython()
@@ -115,15 +126,28 @@ class ExecutionTracker:
         )
 
     def _handle_error(self, record: ExecutionRecord) -> None:
-        """Handle a failing cell with a minimal stub output for now."""
+        """Trace a failing cell and render either the causal chain or fallback."""
 
-        assert record.raised is not None
+        if record.raised is None:
+            return
+
         try:
-            print(f"[BookError] Error detected in exec #{record.exec_id}: {record.raised.exc_type}")
-            print(f"[BookError] Failing line: {record.raised.failing_line}")
-            print(
-                f"[BookError] Graph has {len(self.graph.records)} records, {len(self.graph.edges)} edges"
-            )
+            exception = self._last_exception or Exception(record.raised.exc_message)
+            path = trace_error(self.graph, exception, record.exec_id)
+
+            if path and path.hops:
+                llm_explanation = None
+                if llm_is_enabled():
+                    try:
+                        llm_explanation = llm_explain(path)
+                    except Exception:
+                        _LOGGER.debug(
+                            "BookError: LLM explanation failed, using deterministic summaries",
+                            exc_info=True,
+                        )
+                render_causal_path(path, llm_explanation=llm_explanation)
+            else:
+                render_no_chain(record.raised.exc_type, record.raised.exc_message)
         except Exception:
             _LOGGER.error("BookError _handle_error failed", exc_info=True)
 

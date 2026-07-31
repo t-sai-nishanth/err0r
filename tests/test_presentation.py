@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import html
+
 from bookerrror.presentation.banner import render_banner, render_no_chain_banner
 from bookerrror.presentation.graph_widget import render_graph
 from bookerrror.presentation.path_display import render_path, render_path_text
@@ -10,12 +12,13 @@ from tests.fixtures.sample_data import MOCK_CAUSAL_PATH
 
 def test_render_banner_mock_path():
     html_output = render_banner(MOCK_CAUSAL_PATH)
+    unescaped_output = html.unescape(html_output)
     assert "BookError Causal Trace" in html_output
     assert "KeyError" in html_output
     assert "cell-2" in html_output
     assert "cell-5" in html_output
     assert "cell-9" in html_output
-    assert "dropped column 'age' from df" in html_output
+    assert "dropped column 'age' from df" in unescaped_output
     assert "bookerror-pipeline" in html_output
 
 
